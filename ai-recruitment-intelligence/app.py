@@ -15,7 +15,11 @@ from database.database import (
     get_candidates_by_job,
     get_candidate_by_id,
     update_candidate_analysis,
-    get_all_jobs
+    get_all_jobs,
+    get_history_list,
+    delete_job,
+    clear_all_history,
+    update_candidate_interview_questions
 )
 from utils.file_parser import parse_document
 from utils.helpers import (
@@ -33,6 +37,7 @@ from agents.evidence_agent import EvidenceAgent
 from agents.matching_agent import MatchingAgent
 from agents.noise_agent import NoiseAgent
 from agents.shortlist_agent import ShortlistAgent
+from agents.interview_agent import InterviewAgent
 from utils.gemini_service import GeminiService
 
 # Initialize Flask application
@@ -72,6 +77,13 @@ def index():
     return render_template("index.html", recent_jobs=recent_jobs[:5])
 
 
+@app.route("/history")
+def history():
+    """Recruiter History page showing past analysis sessions."""
+    all_history = get_history_list()
+    return render_template("history.html", history=all_history)
+
+
 @app.route("/dashboard/<int:job_id>")
 def dashboard(job_id: int):
     """Shortlist Intelligence Dashboard for a specific job."""
@@ -84,16 +96,37 @@ def dashboard(job_id: int):
 
     candidates = []
     noise_flagged_count = 0
+    shortlisted_count = 0
+    needs_review_count = 0
+    not_shortlisted_count = 0
 
     for c in raw_candidates:
         cand_dict = dict(c)
+        cand_dict["parsed_sections"] = safe_json_loads(c.get("parsed_sections"), {})
         cand_dict["skills_data"] = safe_json_loads(c.get("extracted_skills"), {})
         cand_dict["noise_data"] = safe_json_loads(c.get("noise_signals"), {})
         cand_dict["evidence_data"] = safe_json_loads(c.get("evidence_items"), [])
+        cand_dict["score_breakdown"] = safe_json_loads(c.get("score_breakdown"), {})
         cand_dict["evidence_count"] = len(cand_dict["evidence_data"])
         cand_dict["verified_evidence_count"] = sum(
             1 for e in cand_dict["evidence_data"] if e.get("status") == "VERIFIED"
         )
+
+        score = cand_dict.get("match_score", 0.0)
+        
+        # Standardized Hackathon Recommendation categories
+        if score >= 75.0 or cand_dict.get("match_tier") == "Strong Shortlist":
+            cand_dict["recommendation_label"] = "Shortlisted"
+            cand_dict["recommendation_class"] = "badge-success"
+            shortlisted_count += 1
+        elif score >= 50.0 or cand_dict.get("match_tier") in ["Potential Match", "Needs Review"]:
+            cand_dict["recommendation_label"] = "Needs Review"
+            cand_dict["recommendation_class"] = "badge-warning"
+            needs_review_count += 1
+        else:
+            cand_dict["recommendation_label"] = "Not Shortlisted"
+            cand_dict["recommendation_class"] = "badge-danger"
+            not_shortlisted_count += 1
 
         if cand_dict["noise_data"] and cand_dict["noise_data"].get("noise_risk_level") in ["MEDIUM", "HIGH"]:
             noise_flagged_count += 1
@@ -105,6 +138,10 @@ def dashboard(job_id: int):
         job=job,
         jd_data=jd_data,
         candidates=candidates,
+        total_candidates=len(candidates),
+        shortlisted_count=shortlisted_count,
+        needs_review_count=needs_review_count,
+        not_shortlisted_count=not_shortlisted_count,
         noise_flagged_count=noise_flagged_count
     )
 
@@ -143,10 +180,13 @@ def candidate_detail(candidate_id: int):
             f"{skill} — Not found in candidate resume" for skill in skills_data.get("missing_critical_skills", [])
         ]
 
+    jd_data = safe_json_loads(job.get("extracted_requirements"), {}) if job else {}
+
     return render_template(
         "candidate.html",
         candidate=candidate,
         job=job,
+        jd_data=jd_data,
         parsed_sections=parsed_sections,
         skills_data=skills_data,
         evidence_items=evidence_items,
@@ -320,7 +360,7 @@ def api_analyze(job_id: int):
                 noise_analysis=noise_analysis
             )
 
-            # Step F: Shortlist & Targeted Interview Question Agent
+            # Step F: Shortlist & Explainability Agent
             verdict = ShortlistAgent.generate_verdict(
                 candidate_data=parsed_profile,
                 jd_data=jd_data,
@@ -328,6 +368,15 @@ def api_analyze(job_id: int):
                 evidence_items=evidence_items,
                 noise_analysis=noise_analysis,
                 match_result=match_result
+            )
+
+            # Step G: Interview Intelligence Agent (5 Categorized Questions with Rationales)
+            interview_questions = InterviewAgent.generate_interview_questions(
+                candidate_data=parsed_profile,
+                jd_data=jd_data,
+                skill_analysis=skill_analysis,
+                evidence_items=evidence_items,
+                noise_data=noise_analysis
             )
 
             # Save full intelligence dossier to SQLite
@@ -353,7 +402,7 @@ def api_analyze(job_id: int):
                 score_breakdown=safe_json_dumps(score_breakdown_full),
                 match_tier=match_result.get("recommendation", match_result.get("match_tier", "Completed")),
                 executive_summary=verdict.get("explanation", verdict.get("executive_summary", "")),
-                interview_questions=safe_json_dumps(verdict.get("interview_questions", [])),
+                interview_questions=safe_json_dumps(interview_questions),
                 analysis_status="completed"
             )
             processed_count += 1
@@ -364,6 +413,47 @@ def api_analyze(job_id: int):
             "job_id": job_id
         })
 
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/candidate/<int:candidate_id>/generate-interview", methods=["POST"])
+def api_generate_interview_questions(candidate_id: int):
+    """
+    Generate 5 personalized, categorized interview questions on-demand for a candidate.
+    Persists to SQLite and returns JSON for dynamic frontend rendering.
+    """
+    try:
+        candidate = get_candidate_by_id(candidate_id)
+        if not candidate:
+            return jsonify({"success": False, "error": "Candidate not found"}), 404
+
+        job = get_job_by_id(candidate["job_id"])
+        if not job:
+            return jsonify({"success": False, "error": "Associated job not found"}), 404
+
+        jd_data = safe_json_loads(job.get("extracted_requirements"), {})
+        parsed_sections = safe_json_loads(candidate.get("parsed_sections"), {})
+        skills_data = safe_json_loads(candidate.get("extracted_skills"), {})
+        evidence_items = safe_json_loads(candidate.get("evidence_items"), [])
+        noise_data = safe_json_loads(candidate.get("noise_signals"), {})
+
+        questions = InterviewAgent.generate_interview_questions(
+            candidate_data=parsed_sections if parsed_sections else {"name": candidate["name"]},
+            jd_data=jd_data,
+            skill_analysis=skills_data,
+            evidence_items=evidence_items,
+            noise_data=noise_data
+        )
+
+        # Save to database
+        update_candidate_interview_questions(candidate_id, safe_json_dumps(questions))
+
+        return jsonify({
+            "success": True,
+            "candidate_id": candidate_id,
+            "questions": questions
+        })
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
@@ -401,6 +491,29 @@ def export_job_shortlist(job_id: int):
         })
 
     return jsonify(export_payload)
+
+
+@app.route("/api/history/delete/<int:job_id>", methods=["POST", "DELETE"])
+def api_delete_history(job_id: int):
+    """Delete a specific analysis session and its associated records."""
+    try:
+        job = get_job_by_id(job_id)
+        if not job:
+            return jsonify({"success": False, "error": "Analysis not found"}), 404
+        delete_job(job_id)
+        return jsonify({"success": True, "message": f"Analysis #{job_id} successfully deleted."})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/history/clear", methods=["POST"])
+def api_clear_history():
+    """Clear all past recruitment analysis records from database."""
+    try:
+        clear_all_history()
+        return jsonify({"success": True, "message": "All recruitment analysis history cleared successfully."})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
 
 
 @app.route("/api/test-gemini")

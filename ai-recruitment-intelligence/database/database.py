@@ -189,13 +189,25 @@ def update_candidate_analysis(
     conn.close()
 
 
+def update_candidate_interview_questions(candidate_id: int, interview_questions_json: str):
+    """Update interview questions for a candidate in SQLite."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        UPDATE candidates SET interview_questions = ? WHERE id = ?
+    """, (interview_questions_json, candidate_id))
+    conn.commit()
+    conn.close()
+
+
 def get_all_jobs() -> List[Dict[str, Any]]:
     """Retrieve all jobs with candidate counts."""
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("""
         SELECT j.*, COUNT(c.id) as candidate_count,
-               AVG(CASE WHEN c.analysis_status = 'completed' THEN c.match_score ELSE NULL END) as avg_score
+               AVG(CASE WHEN c.analysis_status = 'completed' THEN c.match_score ELSE NULL END) as avg_score,
+               MAX(CASE WHEN c.analysis_status = 'completed' THEN c.match_score ELSE NULL END) as max_score
         FROM jobs j
         LEFT JOIN candidates c ON j.id = c.job_id
         GROUP BY j.id
@@ -204,3 +216,103 @@ def get_all_jobs() -> List[Dict[str, Any]]:
     rows = cursor.fetchall()
     conn.close()
     return [dict(r) for r in rows]
+
+
+def get_history_list() -> List[Dict[str, Any]]:
+    """
+    Retrieve comprehensive history of all previous recruitment analysis sessions.
+    Includes candidate summaries, match percentages, recommendation counts, and timestamps.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT 
+            j.id as analysis_id,
+            j.title as job_title,
+            j.raw_text as job_description,
+            j.file_name as jd_file_name,
+            j.created_at as timestamp,
+            COUNT(c.id) as candidate_count,
+            AVG(c.match_score) as avg_match,
+            MAX(c.match_score) as top_match,
+            SUM(CASE WHEN c.match_score >= 75 THEN 1 ELSE 0 END) as shortlisted_count,
+            SUM(CASE WHEN c.match_score >= 50 AND c.match_score < 75 THEN 1 ELSE 0 END) as needs_review_count,
+            SUM(CASE WHEN c.match_score < 50 THEN 1 ELSE 0 END) as not_shortlisted_count,
+            GROUP_CONCAT(c.name, ', ') as candidate_names,
+            GROUP_CONCAT(c.file_name, ', ') as uploaded_files
+        FROM jobs j
+        LEFT JOIN candidates c ON j.id = c.job_id
+        GROUP BY j.id
+        ORDER BY j.created_at DESC
+    """)
+    rows = cursor.fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def delete_job(job_id: int) -> bool:
+    """
+    Delete a specific recruitment analysis session and all associated candidate records.
+    Also attempts to clean up uploaded files.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    # Get associated file paths to remove from disk
+    cursor.execute("SELECT file_path FROM jobs WHERE id = ?", (job_id,))
+    job_row = cursor.fetchone()
+
+    cursor.execute("SELECT file_path FROM candidates WHERE job_id = ?", (job_id,))
+    cand_rows = cursor.fetchall()
+
+    # Delete records (foreign key cascade removes candidates)
+    cursor.execute("DELETE FROM candidates WHERE job_id = ?", (job_id,))
+    cursor.execute("DELETE FROM jobs WHERE id = ?", (job_id,))
+    conn.commit()
+    conn.close()
+
+    # Clean files from disk safely
+    if job_row and job_row["file_path"] and os.path.exists(job_row["file_path"]):
+        try:
+            os.remove(job_row["file_path"])
+        except Exception:
+            pass
+
+    for crow in cand_rows:
+        if crow["file_path"] and os.path.exists(crow["file_path"]):
+            try:
+                os.remove(crow["file_path"])
+            except Exception:
+                pass
+
+    return True
+
+
+def clear_all_history() -> bool:
+    """
+    Clear all past recruitment analysis history from SQLite database.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    # Query file paths to clean
+    cursor.execute("SELECT file_path FROM jobs WHERE file_path IS NOT NULL")
+    job_files = cursor.fetchall()
+    cursor.execute("SELECT file_path FROM candidates WHERE file_path IS NOT NULL")
+    cand_files = cursor.fetchall()
+
+    cursor.execute("DELETE FROM candidates")
+    cursor.execute("DELETE FROM jobs")
+    cursor.execute("DELETE FROM sqlite_sequence WHERE name IN ('jobs', 'candidates')")
+    conn.commit()
+    conn.close()
+
+    # Remove files
+    for r in job_files + cand_files:
+        if r["file_path"] and os.path.exists(r["file_path"]):
+            try:
+                os.remove(r["file_path"])
+            except Exception:
+                pass
+
+    return True

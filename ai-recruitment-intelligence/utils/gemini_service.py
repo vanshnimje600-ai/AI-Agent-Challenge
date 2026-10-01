@@ -5,7 +5,6 @@ import logging
 from typing import Dict, Any, Optional, Tuple
 from dotenv import load_dotenv
 
-# Ensure environment variables are loaded
 load_dotenv()
 
 logger = logging.getLogger("GeminiService")
@@ -16,17 +15,15 @@ class GeminiService:
     """
     Dedicated, resilient service for Google Gemini API integration.
     Handles authentication, structured JSON generation, text validation,
-    and granular error diagnostics.
+    and multi-model fallback diagnostics.
     """
 
-    DEFAULT_MODEL = "gemini-2.5-flash"
-    FALLBACK_MODEL = "gemini-1.5-flash"
+    MODELS_TO_TRY = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-2.5-flash", "gemini-1.5-pro"]
     MIN_DOC_CHARS = 40
 
     @classmethod
     def get_api_key(cls) -> Optional[str]:
         """Retrieve and sanitize GEMINI_API_KEY from environment."""
-        # Reload to capture any live changes to .env file
         load_dotenv(override=True)
         key = os.getenv("GEMINI_API_KEY", "").strip()
         if not key or key in ["your_gemini_api_key_here", "your_actual_gemini_api_key_here", ""]:
@@ -63,7 +60,7 @@ class GeminiService:
         try:
             import google.generativeai as genai_legacy
             genai_legacy.configure(api_key=api_key)
-            model = genai_legacy.GenerativeModel(cls.FALLBACK_MODEL)
+            model = genai_legacy.GenerativeModel("gemini-1.5-flash")
             return model, "generativeai", None
         except ImportError:
             return None, None, "Neither 'google-genai' nor 'google-generativeai' packages are installed."
@@ -106,7 +103,7 @@ class GeminiService:
 
         text = text.strip()
 
-        # If there is leading or trailing conversational filler, extract outermost JSON object or array
+        # Extract outermost JSON object or array
         json_match = re.search(r'(\{[\s\S]*\}|\[[\s\S]*\])', text)
         if json_match:
             text = json_match.group(0).strip()
@@ -128,56 +125,51 @@ class GeminiService:
         if err:
             return None, err
 
-        selected_model = model_name or cls.DEFAULT_MODEL
+        models_list = [model_name] if model_name else [os.getenv("GEMINI_MODEL", "gemini-2.0-flash")] + cls.MODELS_TO_TRY
+        last_err = None
 
-        try:
-            raw_text = ""
-            if client_type == "genai":
-                try:
-                    response = client.models.generate_content(
-                        model=selected_model,
-                        contents=prompt,
-                        config={
-                            "response_mime_type": "application/json",
-                            "system_instruction": system_instruction,
-                        }
-                    )
-                    raw_text = response.text or ""
-                except Exception as model_err:
-                    # If 2.5-flash fails (e.g. model not found in region), fallback to 1.5-flash
-                    logger.warning(f"Error with {selected_model}: {model_err}. Trying fallback model {cls.FALLBACK_MODEL}...")
-                    response = client.models.generate_content(
-                        model=cls.FALLBACK_MODEL,
-                        contents=prompt,
-                        config={
-                            "response_mime_type": "application/json",
-                            "system_instruction": system_instruction,
-                        }
-                    )
-                    raw_text = response.text or ""
-            else:
-                full_prompt = f"{system_instruction}\n\nStrictly return valid JSON.\n\n{prompt}"
-                response = client.generate_content(full_prompt)
-                raw_text = response.text or ""
-
-            cleaned_json_str = cls.clean_json_response(raw_text)
-            if not cleaned_json_str:
-                return None, "Gemini returned an empty response."
-
+        for model in models_list:
+            if not model:
+                continue
             try:
-                parsed = json.loads(cleaned_json_str)
-                return parsed, None
-            except json.JSONDecodeError as jde:
-                logger.error(f"JSON parsing error: {jde}. Raw response was: {raw_text[:300]}")
-                return None, f"Failed to parse Gemini output as JSON: {str(jde)}"
+                raw_text = ""
+                if client_type == "genai":
+                    response = client.models.generate_content(
+                        model=model,
+                        contents=prompt,
+                        config={
+                            "response_mime_type": "application/json",
+                            "system_instruction": system_instruction,
+                        }
+                    )
+                    raw_text = response.text or ""
+                else:
+                    full_prompt = f"{system_instruction}\n\nStrictly return valid JSON.\n\n{prompt}"
+                    response = client.generate_content(full_prompt)
+                    raw_text = response.text or ""
 
-        except Exception as e:
-            error_msg = str(e)
-            if "API_KEY_INVALID" in error_msg or "400" in error_msg and "API key" in error_msg:
-                return None, "Invalid Gemini API key. Please verify your GEMINI_API_KEY in .env."
-            elif "RESOURCE_EXHAUSTED" in error_msg or "429" in error_msg:
-                return None, "Gemini API rate limit or quota exceeded. Please wait a moment or check your quota."
-            return None, f"Gemini API request failed: {error_msg}"
+                cleaned_json_str = cls.clean_json_response(raw_text)
+                if not cleaned_json_str:
+                    continue
+
+                try:
+                    parsed = json.loads(cleaned_json_str)
+                    return parsed, None
+                except json.JSONDecodeError as jde:
+                    last_err = f"Failed to parse Gemini output as JSON: {str(jde)}"
+                    continue
+
+            except Exception as e:
+                error_msg = str(e)
+                last_err = error_msg
+                if "API_KEY_INVALID" in error_msg or ("400" in error_msg and "API key" in error_msg):
+                    return None, "Invalid Gemini API key. Please verify your GEMINI_API_KEY in .env."
+                elif "RESOURCE_EXHAUSTED" in error_msg or "429" in error_msg:
+                    return None, "Gemini API rate limit or quota exceeded. Please wait a moment."
+                # Fallback to next model in list
+                continue
+
+        return None, f"Gemini request failed: {last_err}"
 
     @classmethod
     def generate_text(
@@ -196,7 +188,7 @@ class GeminiService:
         try:
             if client_type == "genai":
                 response = client.models.generate_content(
-                    model=cls.DEFAULT_MODEL,
+                    model="gemini-2.0-flash",
                     contents=prompt,
                     config={"system_instruction": system_instruction}
                 )

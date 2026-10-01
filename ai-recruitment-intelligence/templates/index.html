@@ -23,6 +23,7 @@
       </a>
       <div class="nav-links">
         <a href="/" class="nav-link active">New Analysis</a>
+        <a href="/history" class="nav-link">Analysis History</a>
         <span class="badge {% if gemini_active %}badge-success{% else %}badge-warning{% endif %}">
           {% if gemini_active %}● Gemini AI Connected{% else %}○ Local Heuristic Mode{% endif %}
         </span>
@@ -147,8 +148,15 @@
     {% if recent_jobs %}
     <div class="card" style="margin-top: 48px;">
       <div class="card-header">
-        <h3 class="card-title">🕒 Recent Job Shortlists</h3>
-        <span class="badge badge-info">{{ recent_jobs|length }} Analyzed</span>
+        <div>
+          <h3 class="card-title">🕒 Recent Job Shortlists</h3>
+          <p class="card-subtitle">Saved recruitment analyses in local SQLite database.</p>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <a href="/history" class="btn btn-secondary" style="padding: 6px 14px; font-size: 0.8rem;">
+            📜 View Full History ➔
+          </a>
+        </div>
       </div>
       <div class="table-container">
         <table class="data-table">
