@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Recruitment Intelligence Agent | Evidence-Backed Shortlisting</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+  <div class="container">
+    <!-- Navbar -->
+    <nav class="navbar">
+      <a href="/" class="nav-brand">
+        <div class="brand-icon">⚡</div>
+        <div class="brand-text">
+          <h1>RecruitIntel AI</h1>
+          <span>Evidence-Backed Shortlist</span>
+        </div>
+      </a>
+      <div class="nav-links">
+        <a href="/" class="nav-link active">New Analysis</a>
+        <span class="badge {% if gemini_active %}badge-success{% else %}badge-warning{% endif %}">
+          {% if gemini_active %}● Gemini AI Connected{% else %}○ Local Heuristic Mode{% endif %}
+        </span>
+      </div>
+    </nav>
+
+    <!-- Hero -->
+    <header class="hero">
+      <div class="hero-badge">Autonomous Multi-Agent Recruiter</div>
+      <h1 class="hero-title">From Hundreds of Resumes to an Evidence-Backed Shortlist</h1>
+      <p class="hero-subtitle">
+        Eliminate keyword stuffing, uncover genuine candidate capabilities, cross-verify resume claims with job requirements, and generate explainable hiring intelligence.
+      </p>
+    </header>
+
+    <!-- Agent Pipeline Steps -->
+    <div class="agent-pipeline-bar">
+      <div class="pipeline-step">
+        <div class="step-dot"></div>
+        <span>1. JD Decomposition</span>
+      </div>
+      <span class="pipeline-arrow">➔</span>
+      <div class="pipeline-step">
+        <div class="step-dot"></div>
+        <span>2. Resume Structuring</span>
+      </div>
+      <span class="pipeline-arrow">➔</span>
+      <div class="pipeline-step">
+        <div class="step-dot"></div>
+        <span>3. Skill Normalization</span>
+      </div>
+      <span class="pipeline-arrow">➔</span>
+      <div class="pipeline-step">
+        <div class="step-dot"></div>
+        <span>4. Evidence Cross-Check</span>
+      </div>
+      <span class="pipeline-arrow">➔</span>
+      <div class="pipeline-step">
+        <div class="step-dot"></div>
+        <span>5. Anti-Noise Filter</span>
+      </div>
+      <span class="pipeline-arrow">➔</span>
+      <div class="pipeline-step">
+        <div class="step-dot"></div>
+        <span>6. Shortlist Dossier</span>
+      </div>
+    </div>
+
+    <!-- Main Upload Form -->
+    <form id="recruitmentForm" enctype="multipart/form-data">
+      <div class="grid-2">
+        
+        <!-- Job Description Card -->
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title">📌 1. Job Description</h2>
+              <p class="card-subtitle">Upload file or paste requirements</p>
+            </div>
+            <span class="badge badge-primary">Step 1</span>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="jobTitle">Job Title (Optional)</label>
+            <input type="text" id="jobTitle" name="title" class="form-control" placeholder="e.g. Senior Full Stack Engineer">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Upload JD File (.pdf, .docx, .txt)</label>
+            <div class="upload-dropzone" id="jdDropzone">
+              <div class="dropzone-icon">📁</div>
+              <div class="dropzone-title">Drag & drop JD document here</div>
+              <div class="dropzone-hint">or click to browse your files</div>
+              <input type="file" id="jdFile" name="jd_file" class="file-input-hidden" accept=".pdf,.docx,.txt">
+            </div>
+            <div id="jdFilePreview" class="file-preview-list"></div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="jobText">Or Paste Job Description Text</label>
+            <textarea id="jobText" name="job_text" class="form-control" placeholder="Paste full JD text with requirements, responsibilities, and qualifications..."></textarea>
+          </div>
+        </div>
+
+        <!-- Resumes Upload Card -->
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title">👥 2. Candidate Resumes</h2>
+              <p class="card-subtitle">Batch upload candidate files</p>
+            </div>
+            <span class="badge badge-primary">Step 2</span>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Upload Resumes (.pdf, .docx, .txt)</label>
+            <div class="upload-dropzone" id="resumeDropzone">
+              <div class="dropzone-icon">📑</div>
+              <div class="dropzone-title">Drag & drop multiple resumes here</div>
+              <div class="dropzone-hint">Supports batch selection of PDF & DOCX</div>
+              <input type="file" id="resumeFiles" name="resumes" class="file-input-hidden" multiple accept=".pdf,.docx,.txt">
+            </div>
+            <div id="resumeFilePreview" class="file-preview-list"></div>
+          </div>
+
+          <div style="background: rgba(255, 255, 255, 0.02); padding: 14px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); font-size: 0.85rem; color: var(--text-muted);">
+            <strong style="color: var(--text-main);">🛡️ Anti-Noise Verification:</strong> Each resume is inspected for real project evidence. Mere keyword mentions without supporting context will be flagged.
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Action Button -->
+      <div style="margin-top: 10px; text-align: center;">
+        <button type="submit" id="submitBtn" class="btn btn-primary btn-lg">
+          <span>🚀 Run Recruitment Intelligence Agents</span>
+        </button>
+      </div>
+    </form>
+
+    <!-- Recent History Section -->
+    {% if recent_jobs %}
+    <div class="card" style="margin-top: 48px;">
+      <div class="card-header">
+        <h3 class="card-title">🕒 Recent Job Shortlists</h3>
+        <span class="badge badge-info">{{ recent_jobs|length }} Analyzed</span>
+      </div>
+      <div class="table-container">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Job Title</th>
+              <th>Candidates</th>
+              <th>Date Analyzed</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for j in recent_jobs %}
+            <tr>
+              <td><strong>{{ j.title }}</strong></td>
+              <td><span class="badge badge-primary">{{ j.candidate_count }} Resumes</span></td>
+              <td style="color: var(--text-dim);">{{ j.created_at }}</td>
+              <td>
+                <a href="/dashboard/{{ j.id }}" class="btn btn-secondary" style="padding: 6px 14px; font-size: 0.8rem;">View Shortlist ➔</a>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Status / Progress Modal -->
+    <div class="modal-overlay" id="statusModal">
+      <div class="modal-content">
+        <div class="spinner"></div>
+        <h3 style="font-size: 1.3rem; margin-bottom: 8px;">Recruitment Intelligence in Progress</h3>
+        <p style="color: var(--text-muted); font-size: 0.9rem;">Multi-Agent system is evaluating candidate resumes...</p>
+
+        <div class="status-step-list">
+          <div class="status-step-item" id="step-upload">
+            <span class="step-icon">⚪</span>
+            <span>Parsing document files & text normalization</span>
+          </div>
+          <div class="status-step-item" id="step-jd">
+            <span class="step-icon">⚪</span>
+            <span>JDAgent: Extracting core requirements & dealbreakers</span>
+          </div>
+          <div class="status-step-item" id="step-resume">
+            <span class="step-icon">⚪</span>
+            <span>ResumeAgent: Extracting work history & project bullets</span>
+          </div>
+          <div class="status-step-item" id="step-skill">
+            <span class="step-icon">⚪</span>
+            <span>SkillAgent: Normalizing taxonomy & synonym matching</span>
+          </div>
+          <div class="status-step-item" id="step-evidence">
+            <span class="step-icon">⚪</span>
+            <span>EvidenceAgent: Cross-checking claims with proof snippets</span>
+          </div>
+          <div class="status-step-item" id="step-noise">
+            <span class="step-icon">⚪</span>
+            <span>NoiseAgent: Flagging keyword stuffing & buzzword dumps</span>
+          </div>
+          <div class="status-step-item" id="step-shortlist">
+            <span class="step-icon">⚪</span>
+            <span>ShortlistAgent: Generating explainable shortlist dossier</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+      AI Recruitment Intelligence Agent • College Hackathon Project
+    </footer>
+  </div>
+
+  <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+</body>
+</html>

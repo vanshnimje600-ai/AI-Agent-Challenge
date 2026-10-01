@@ -1,0 +1,23 @@
+Alex Morgan
+Email: alex.morgan@email.com | Phone: (555) 234-5678
+Location: San Francisco, CA
+
+Professional Summary:
+Senior Python Backend Developer with 4 years of experience building high-traffic REST APIs and microservices using Flask and PostgreSQL.
+
+Technical Skills:
+Python, Flask, FastAPI, PostgreSQL, SQL, Docker, Git, Redis, REST API
+
+Work Experience:
+Lead Backend Developer | CloudScale Systems (2022 - Present)
+- Architected and deployed 15+ RESTful API microservices using Python and Flask serving 500k monthly requests.
+- Optimized PostgreSQL database schema and complex SQL queries, reducing average API response times by 35%.
+- Containerized development and staging environments using Docker, cutting onboarding time in half.
+- Integrated Redis caching layer for session management and rate limiting.
+
+Software Engineer | AppForge Inc. (2020 - 2022)
+- Developed secure authentication endpoints and CRUD operations in Python.
+- Managed Git workflow and automated testing pipelines.
+
+Education:
+B.S. in Computer Science | University of California (2020)

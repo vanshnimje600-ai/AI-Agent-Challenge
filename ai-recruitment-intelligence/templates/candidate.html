@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Candidate Intelligence Dossier | {{ candidate.name }}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+  <div class="container">
+    <!-- Navbar -->
+    <nav class="navbar">
+      <a href="/" class="nav-brand">
+        <div class="brand-icon">⚡</div>
+        <div class="brand-text">
+          <h1>RecruitIntel AI</h1>
+          <span>Evidence-Backed Shortlist</span>
+        </div>
+      </a>
+      <div class="nav-links">
+        <a href="/dashboard/{{ job.id }}" class="nav-link">← Back to Dashboard</a>
+      </div>
+    </nav>
+
+    <!-- Candidate Header Card -->
+    <div class="card" style="background: linear-gradient(135deg, rgba(30, 41, 67, 0.95), rgba(18, 24, 38, 0.95)); border: 1px solid rgba(99, 102, 241, 0.3);">
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px;">
+        <div>
+          <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 6px;">
+            <h1 style="font-size: 2.2rem; font-weight: 800; letter-spacing: -0.02em;">{{ candidate.name }}</h1>
+            {% if candidate.match_tier == 'Strong Shortlist' %}
+            <span class="badge badge-success" style="font-size: 0.85rem; padding: 6px 14px;">★ Strong Shortlist</span>
+            {% elif candidate.match_tier == 'Potential Match' %}
+            <span class="badge badge-primary" style="font-size: 0.85rem; padding: 6px 14px;">Potential Match</span>
+            {% elif candidate.match_tier == 'Needs Review' %}
+            <span class="badge badge-warning" style="font-size: 0.85rem; padding: 6px 14px;">Needs Review</span>
+            {% else %}
+            <span class="badge badge-danger" style="font-size: 0.85rem; padding: 6px 14px;">Low Relevance</span>
+            {% endif %}
+          </div>
+          <div style="font-size: 0.9rem; color: var(--text-muted); display: flex; gap: 16px; flex-wrap: wrap;">
+            <span>💼 Target Role: <strong style="color: var(--text-main);">{{ job.title }}</strong></span>
+            <span>📧 {{ candidate.email }}</span>
+            <span>📞 {{ candidate.phone }}</span>
+            <span>📄 {{ candidate.file_name }}</span>
+          </div>
+        </div>
+
+        <!-- Score Big Badge -->
+        <div style="text-align: right; background: rgba(0, 0, 0, 0.3); padding: 16px 24px; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+          <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700;">
+            Recruitment Fit Score
+          </div>
+          <div style="font-size: 2.5rem; font-weight: 800; color: #fff; line-height: 1.1;">
+            {{ candidate.match_score|round(1) }}<span style="font-size: 1.2rem; color: var(--text-dim);">/100</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Executive Verdict Box -->
+      {% if candidate.executive_summary %}
+      <div style="margin-top: 24px; padding: 18px; background: rgba(255, 255, 255, 0.03); border-radius: var(--radius-sm); border-left: 4px solid var(--primary);">
+        <div style="font-size: 0.8rem; font-weight: 700; color: var(--secondary); text-transform: uppercase; margin-bottom: 6px;">
+          🧠 Executive Shortlist Synthesis
+        </div>
+        <p style="font-size: 0.95rem; color: #e2e8f0; line-height: 1.6;">
+          {{ candidate.executive_summary }}
+        </p>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Strengths, Missing Requirements & Uncertainties Grid -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; margin-bottom: 28px;">
+      <!-- Strengths -->
+      <div class="card" style="margin-bottom: 0;">
+        <div class="card-header">
+          <h3 class="card-title" style="color: #34d399;">✅ Verified Strengths</h3>
+        </div>
+        <ul style="padding-left: 20px; display: flex; flex-direction: column; gap: 10px; font-size: 0.9rem; color: var(--text-main);">
+          {% if dossier and dossier.strengths %}
+            {% for s in dossier.strengths %}
+            <li>{{ s }}</li>
+            {% endfor %}
+          {% else %}
+            <li>Directly demonstrated proficiency in core technical requirements.</li>
+          {% endif %}
+        </ul>
+      </div>
+
+      <!-- Missing Requirements (Not Found) -->
+      <div class="card" style="margin-bottom: 0;">
+        <div class="card-header">
+          <h3 class="card-title" style="color: #f87171;">✗ Missing Requirements</h3>
+          <span class="badge badge-danger">Not Found</span>
+        </div>
+        <ul style="padding-left: 20px; display: flex; flex-direction: column; gap: 10px; font-size: 0.9rem; color: var(--text-main);">
+          {% if dossier and dossier.missing_requirements %}
+            {% for m in dossier.missing_requirements %}
+            <li style="color: #fca5a5;">{{ m }}</li>
+            {% endfor %}
+          {% else %}
+            <li style="color: var(--text-dim);">No mandatory requirements missing.</li>
+          {% endif %}
+        </ul>
+      </div>
+
+      <!-- Uncertain / Ambiguous Requirements -->
+      <div class="card" style="margin-bottom: 0;">
+        <div class="card-header">
+          <h3 class="card-title" style="color: #fbbf24;">⚠️ Uncertain / Unverified</h3>
+          <span class="badge badge-warning">Unclear</span>
+        </div>
+        <ul style="padding-left: 20px; display: flex; flex-direction: column; gap: 10px; font-size: 0.9rem; color: var(--text-main);">
+          {% if dossier and dossier.uncertain_requirements %}
+            {% for u in dossier.uncertain_requirements %}
+            <li style="color: #fde68a;">{{ u }}</li>
+            {% endfor %}
+          {% else %}
+            <li style="color: var(--text-dim);">All claimed capabilities are substantiated.</li>
+          {% endif %}
+        </ul>
+      </div>
+    </div>
+
+    <!-- Transparent Score Breakdown -->
+    {% if score_breakdown and score_breakdown.breakdown %}
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <h3 class="card-title">📊 Multi-Factor Transparent Score Breakdown</h3>
+          <p class="card-subtitle">No black-box scoring. See exactly how points were assigned or deducted.</p>
+        </div>
+      </div>
+      <div class="grid-2" style="gap: 16px;">
+        {% for key, factor in score_breakdown.breakdown.items() %}
+        <div style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 14px;">
+          <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+            <strong style="font-size: 0.9rem;">{{ factor.label }}</strong>
+            <span style="font-weight: 700; color: {% if factor.points < 0 %}#f87171{% else %}#34d399{% endif %};">
+              {{ factor.points }}{% if factor.max > 0 %} / {{ factor.max }} pts{% endif %}
+            </span>
+          </div>
+          <div style="font-size: 0.8rem; color: var(--text-dim);">{{ factor.details }}</div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Evidence Verification Matrix -->
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <h3 class="card-title">🔍 Evidence Verification Matrix</h3>
+          <p class="card-subtitle">Requirement vs Resume Proof cross-referenced by the Evidence Agent.</p>
+        </div>
+        <span class="badge badge-info">{{ evidence_items|length }} Requirements Checked</span>
+      </div>
+
+      {% if evidence_items %}
+        {% for ev in evidence_items %}
+        <div class="evidence-card">
+          <div class="evidence-header">
+            <div>
+              <strong style="font-size: 0.95rem; color: var(--text-main);">📌 Requirement: {{ ev.requirement }}</strong>
+            </div>
+            <div>
+              {% if ev.status == 'VERIFIED' %}
+              <span class="badge badge-success">✓ Verified Proof</span>
+              {% elif ev.status == 'PARTIAL' %}
+              <span class="badge badge-warning">~ Partial Mention</span>
+              {% else %}
+              <span class="badge badge-danger">✗ Unverified / Missing</span>
+              {% endif %}
+            </div>
+          </div>
+          <div class="evidence-quote">
+            "{{ ev.evidence_snippet }}"
+          </div>
+          <div class="evidence-source">
+            📍 Source Section: <strong>{{ ev.source_section }}</strong> • Confidence: <strong>{{ ev.confidence }}</strong>
+          </div>
+        </div>
+        {% endfor %}
+      {% else %}
+        <p style="color: var(--text-dim); font-size: 0.9rem;">No direct evidence items processed.</p>
+      {% endif %}
+    </div>
+
+    <!-- Keyword Stuffing & Anti-Noise Detector -->
+    {% if noise_data %}
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <h3 class="card-title">🛡️ Anti-Noise & Keyword Stuffing Analysis</h3>
+          <p class="card-subtitle">Detecting buzzwords listed without applied project evidence or experience.</p>
+        </div>
+        <span class="badge {% if noise_data.noise_risk_level == 'HIGH' %}badge-danger{% elif noise_data.noise_risk_level == 'MEDIUM' %}badge-warning{% else %}badge-success{% endif %}">
+          Risk: {{ noise_data.noise_risk_level }}
+        </span>
+      </div>
+
+      <div style="margin-bottom: 16px; font-size: 0.92rem; color: var(--text-main);">
+        <strong>Forensic Verdict:</strong> {{ noise_data.noise_verdict }}
+      </div>
+
+      {% if noise_data.flags %}
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+          {% for flag in noise_data.flags %}
+          <div style="background: rgba(239, 68, 68, 0.08); border-left: 3px solid #ef4444; padding: 10px 14px; border-radius: 4px; font-size: 0.88rem;">
+            <div style="display: flex; justify-content: space-between;">
+              <strong style="color: #fca5a5;">⚠️ {{ flag.type }}: {{ flag.skill_or_keyword }}</strong>
+              <span class="badge badge-danger" style="font-size: 0.7rem;">{{ flag.severity }}</span>
+            </div>
+            <div style="color: var(--text-muted); margin-top: 4px;">{{ flag.explanation }}</div>
+          </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div style="color: #34d399; font-size: 0.9rem;">
+          ✓ No deceptive keyword manipulation detected. Skills claimed align with actual job history.
+        </div>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- Skills Normalization Breakdown -->
+    {% if skills_data %}
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <h3 class="card-title">🏷️ Normalized Skill Taxonomy Matrix</h3>
+          <p class="card-subtitle">Canonical mapping of variations, must-haves, and missing competencies.</p>
+        </div>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 16px;">
+        <div>
+          <div style="font-size: 0.8rem; color: var(--text-muted); font-weight: 700; margin-bottom: 6px;">
+            MATCHED MUST-HAVES:
+          </div>
+          <div class="tag-cloud">
+            {% for s in skills_data.matched_must_haves %}
+            <span class="tag tag-matched">✓ {{ s }}</span>
+            {% else %}
+            <span style="color: var(--text-dim); font-size: 0.8rem;">None</span>
+            {% endfor %}
+          </div>
+        </div>
+
+        {% if skills_data.missing_critical_skills %}
+        <div>
+          <div style="font-size: 0.8rem; color: #f87171; font-weight: 700; margin-bottom: 6px;">
+            MISSING MUST-HAVES:
+          </div>
+          <div class="tag-cloud">
+            {% for s in skills_data.missing_critical_skills %}
+            <span class="tag tag-missing">✗ {{ s }}</span>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
+
+        {% if skills_data.matched_nice_to_haves %}
+        <div>
+          <div style="font-size: 0.8rem; color: #60a5fa; font-weight: 700; margin-bottom: 6px;">
+            MATCHED NICE-TO-HAVES:
+          </div>
+          <div class="tag-cloud">
+            {% for s in skills_data.matched_nice_to_haves %}
+            <span class="tag" style="background: rgba(59, 130, 246, 0.15); border-color: rgba(59, 130, 246, 0.35); color: #93c5fd;">★ {{ s }}</span>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
+
+        {% if skills_data.additional_skills %}
+        <div>
+          <div style="font-size: 0.8rem; color: var(--text-dim); font-weight: 700; margin-bottom: 6px;">
+            ADDITIONAL DEMONSTRATED SKILLS:
+          </div>
+          <div class="tag-cloud">
+            {% for s in skills_data.additional_skills %}
+            <span class="tag">{{ s }}</span>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
+
+        {% if skills_data.normalization_notes %}
+        <div style="margin-top: 10px; padding: 12px; background: rgba(255, 255, 255, 0.02); border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+          <div style="font-size: 0.75rem; color: var(--secondary); font-weight: 700; text-transform: uppercase; margin-bottom: 4px;">
+            🔗 Normalized Synonyms & Equivalencies:
+          </div>
+          <ul style="padding-left: 18px; font-size: 0.82rem; color: var(--text-muted);">
+            {% for note in skills_data.normalization_notes %}
+            <li>{{ note }}</li>
+            {% endfor %}
+          </ul>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Generated Targeted Interview Questions -->
+    {% if interview_questions %}
+    <div class="card" style="border-color: rgba(139, 92, 246, 0.4);">
+      <div class="card-header">
+        <div>
+          <h3 class="card-title" style="color: #c4b5fd;">🎯 Tailored Screening & Interview Probes</h3>
+          <p class="card-subtitle">Engineered questions to rigorously test identified gaps and unverified claims.</p>
+        </div>
+        <span class="badge badge-primary">Shortlist Agent</span>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 14px;">
+        {% for q in interview_questions %}
+        <div style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 16px;">
+          <div style="font-size: 0.78rem; font-weight: 700; color: var(--secondary); text-transform: uppercase; margin-bottom: 4px;">
+            Target Topic: {{ q.topic }}
+          </div>
+          <div style="font-size: 1rem; font-weight: 600; color: #fff; margin-bottom: 8px;">
+            "{{ q.question }}"
+          </div>
+          <div style="font-size: 0.82rem; color: var(--text-muted); background: rgba(0, 0, 0, 0.2); padding: 8px 12px; border-radius: 4px;">
+            <strong style="color: #a5b4fc;">💡 What to listen for:</strong> {{ q.what_to_listen_for }}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Structured Profile Details (Work / Projects / Education) -->
+    {% if parsed_sections %}
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">📋 Extracted Resume Sections</h3>
+      </div>
+
+      <!-- Work History -->
+      {% if parsed_sections.work_experience %}
+      <div style="margin-bottom: 24px;">
+        <h4 style="font-size: 1rem; margin-bottom: 12px; color: var(--secondary);">🏢 Work Experience</h4>
+        {% for exp in parsed_sections.work_experience %}
+        <div style="margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px solid rgba(255, 255, 255, 0.05);">
+          <div style="display: flex; justify-content: space-between;">
+            <strong>{{ exp.role }}</strong>
+            <span style="color: var(--text-dim); font-size: 0.85rem;">{{ exp.duration }}</span>
+          </div>
+          <div style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 6px;">{{ exp.company }}</div>
+          {% if exp.highlights %}
+          <ul style="padding-left: 18px; font-size: 0.88rem; color: #cbd5e1;">
+            {% for hl in exp.highlights %}
+            <li>{{ hl }}</li>
+            {% endfor %}
+          </ul>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      <!-- Projects -->
+      {% if parsed_sections.projects %}
+      <div style="margin-bottom: 24px;">
+        <h4 style="font-size: 1rem; margin-bottom: 12px; color: var(--secondary);">🚀 Notable Projects</h4>
+        {% for proj in parsed_sections.projects %}
+        <div style="margin-bottom: 12px; background: rgba(255,255,255,0.02); padding: 12px; border-radius: var(--radius-sm);">
+          <strong>{{ proj.title }}</strong>
+          {% if proj.tech_stack %}
+          <span style="font-size: 0.8rem; color: var(--secondary); margin-left: 8px;">
+            [{{ proj.tech_stack|join(', ') }}]
+          </span>
+          {% endif %}
+          <p style="font-size: 0.88rem; color: var(--text-muted); margin-top: 4px;">{{ proj.description }}</p>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      <!-- Education -->
+      {% if parsed_sections.education %}
+      <div>
+        <h4 style="font-size: 1rem; margin-bottom: 12px; color: var(--secondary);">🎓 Education</h4>
+        {% for edu in parsed_sections.education %}
+        <div style="font-size: 0.9rem;">
+          <strong>{{ edu.degree }}</strong> — {{ edu.institution }} <span style="color: var(--text-dim);">({{ edu.year }})</span>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- Footer -->
+    <footer class="footer">
+      AI Recruitment Intelligence Agent • College Hackathon Project
+    </footer>
+  </div>
+
+  <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+</body>
+</html>

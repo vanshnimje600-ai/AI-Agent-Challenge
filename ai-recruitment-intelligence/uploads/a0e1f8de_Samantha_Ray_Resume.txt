@@ -1,0 +1,16 @@
+Samantha Ray
+Email: sam.ray@email.com | Phone: (555) 444-1122
+
+Summary:
+Junior Python Programmer with 1 year of experience building script utilities and simple web pages.
+
+Skills:
+Python, HTML, CSS, JavaScript, Git, SQLite
+
+Experience:
+Intern Developer | ByteLogic (2023 - 2024)
+- Wrote automated Python scripts for data scraping and CSV cleaning.
+- Maintained internal SQLite database records.
+
+Education:
+Associate Degree in Information Technology (2023)

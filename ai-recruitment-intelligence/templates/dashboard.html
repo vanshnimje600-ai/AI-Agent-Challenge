@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Shortlist Intelligence Dashboard | {{ job.title }}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+  <div class="container">
+    <!-- Navbar -->
+    <nav class="navbar">
+      <a href="/" class="nav-brand">
+        <div class="brand-icon">⚡</div>
+        <div class="brand-text">
+          <h1>RecruitIntel AI</h1>
+          <span>Evidence-Backed Shortlist</span>
+        </div>
+      </a>
+      <div class="nav-links">
+        <a href="/" class="nav-link">← New Analysis</a>
+        <a href="/dashboard/{{ job.id }}" class="nav-link active">Dashboard</a>
+      </div>
+    </nav>
+
+    <!-- Job Header Summary -->
+    <div class="card" style="background: linear-gradient(135deg, rgba(30, 41, 67, 0.9), rgba(18, 24, 38, 0.9));">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px;">
+        <div>
+          <div style="font-size: 0.8rem; color: var(--secondary); text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em; margin-bottom: 4px;">
+            Target Position
+          </div>
+          <h1 style="font-size: 1.8rem; font-weight: 800; letter-spacing: -0.02em;">{{ job.title }}</h1>
+          <p style="color: var(--text-muted); font-size: 0.9rem; margin-top: 6px; max-width: 750px;">
+            {{ jd_data.summary if jd_data and jd_data.summary else 'Automated evidence-backed evaluation across candidate profiles.' }}
+          </p>
+        </div>
+        <div style="display: flex; gap: 10px;">
+          <a href="/api/job/{{ job.id }}/export" class="btn btn-secondary" target="_blank">
+            📥 Export Report (JSON)
+          </a>
+        </div>
+      </div>
+
+      <!-- Core Requirements Chips -->
+      {% if jd_data and jd_data.must_have_skills %}
+      <div style="margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border-color);">
+        <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 8px; font-weight: 600;">
+          CORE MUST-HAVES:
+        </div>
+        <div class="tag-cloud">
+          {% for skill in jd_data.must_have_skills %}
+          <span class="tag tag-matched">✓ {{ skill }}</span>
+          {% endfor %}
+          {% if jd_data.min_experience_years %}
+          <span class="tag" style="background: rgba(99, 102, 241, 0.15); border-color: rgba(99, 102, 241, 0.35); color: #c7d2fe;">
+            ⏳ Min {{ jd_data.min_experience_years }}+ Yrs
+          </span>
+          {% endif %}
+        </div>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Metric Counters Grid -->
+    <div class="metrics-grid">
+      <div class="metric-card">
+        <div class="metric-label">Total Resumes</div>
+        <div class="metric-value">{{ candidates|length }}</div>
+        <div class="metric-subtext">Processed & Analyzed</div>
+      </div>
+
+      <div class="metric-card">
+        <div class="metric-label">Strong Shortlist</div>
+        <div class="metric-value" style="color: #34d399;">
+          {{ candidates|selectattr("match_tier", "equalto", "Strong Shortlist")|list|length }}
+        </div>
+        <div class="metric-subtext">Verified high-fit talent</div>
+      </div>
+
+      <div class="metric-card">
+        <div class="metric-label">Potential Match</div>
+        <div class="metric-value" style="color: #818cf8;">
+          {{ candidates|selectattr("match_tier", "equalto", "Potential Match")|list|length }}
+        </div>
+        <div class="metric-subtext">Good fit with minor gaps</div>
+      </div>
+
+      <div class="metric-card">
+        <div class="metric-label">Keyword Noise Flags</div>
+        <div class="metric-value" style="color: #f87171;">
+          {{ noise_flagged_count }}
+        </div>
+        <div class="metric-subtext">Unsubstantiated claims detected</div>
+      </div>
+    </div>
+
+    <!-- Candidate Table Card -->
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <h2 class="card-title">🏆 Candidate Shortlist & Evidence Dossiers</h2>
+          <p class="card-subtitle">Ranked transparently by verified skills, experience, and citation depth.</p>
+        </div>
+      </div>
+
+      <!-- Search & Filter Controls -->
+      <div style="display: flex; gap: 14px; margin-bottom: 20px; flex-wrap: wrap;">
+        <input type="text" id="candidateSearch" class="form-control" style="flex: 2; min-width: 240px;" placeholder="🔍 Search candidates by name or skill...">
+        <select id="tierFilter" class="form-control" style="flex: 1; min-width: 180px;">
+          <option value="ALL">All Categories</option>
+          <option value="Strong Shortlist">Strong Shortlist (80%+)</option>
+          <option value="Potential Match">Potential Match (65-79%)</option>
+          <option value="Needs Review">Needs Review (50-64%)</option>
+          <option value="Low Relevance">Low Relevance (&lt;50%)</option>
+        </select>
+      </div>
+
+      <!-- Data Table -->
+      <div class="table-container">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Rank & Candidate</th>
+              <th>Overall Score</th>
+              <th>Tier</th>
+              <th>Matched vs Missing Skills</th>
+              <th>Evidence & Noise</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for c in candidates %}
+            <tr class="candidate-row" 
+                data-name="{{ c.name }}" 
+                data-tier="{{ c.match_tier }}" 
+                data-skills="{% if c.skills_data %}{{ c.skills_data.normalized_candidate_skills|join(' ') }}{% endif %}">
+              
+              <!-- Name & Contact -->
+              <td>
+                <div style="display: flex; align-items: center; gap: 12px;">
+                  <div style="width: 32px; height: 32px; border-radius: 50%; background: rgba(255,255,255,0.08); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.85rem; color: var(--secondary);">
+                    #{{ loop.index }}
+                  </div>
+                  <div>
+                    <div style="font-weight: 700; font-size: 1rem;">{{ c.name }}</div>
+                    <div style="font-size: 0.78rem; color: var(--text-dim);">
+                      {{ c.email if c.email and c.email != 'N/A' else c.file_name }}
+                    </div>
+                  </div>
+                </div>
+              </td>
+
+              <!-- Score & Progress Bar -->
+              <td style="min-width: 150px;">
+                <div style="display: flex; align-items: baseline; gap: 6px; margin-bottom: 4px;">
+                  <strong style="font-size: 1.25rem;">{{ c.match_score|round(1) }}</strong>
+                  <span style="font-size: 0.75rem; color: var(--text-dim);">/ 100</span>
+                </div>
+                <div class="progress-bar-container">
+                  <div class="progress-bar-fill {% if c.match_score >= 80 %}fill-success{% elif c.match_score >= 65 %}fill-primary{% elif c.match_score >= 50 %}fill-warning{% else %}fill-danger{% endif %}"
+                       style="width: {{ c.match_score }}%;"></div>
+                </div>
+              </td>
+
+              <!-- Tier Badge -->
+              <td>
+                {% if c.match_tier == 'Strong Shortlist' %}
+                <span class="badge badge-success">★ Strong Shortlist</span>
+                {% elif c.match_tier == 'Potential Match' %}
+                <span class="badge badge-primary">Potential Match</span>
+                {% elif c.match_tier == 'Needs Review' %}
+                <span class="badge badge-warning">Needs Review</span>
+                {% else %}
+                <span class="badge badge-danger">Low Relevance</span>
+                {% endif %}
+              </td>
+
+              <!-- Skills Snapshot -->
+              <td style="max-width: 260px;">
+                {% if c.skills_data %}
+                <div style="display: flex; flex-wrap: wrap; gap: 4px;">
+                  {% for s in c.skills_data.matched_must_haves[:3] %}
+                  <span class="tag tag-matched" style="font-size: 0.72rem; padding: 2px 8px;">{{ s }}</span>
+                  {% endfor %}
+                  {% if c.skills_data.missing_critical_skills %}
+                  <span class="tag tag-missing" style="font-size: 0.72rem; padding: 2px 8px;">
+                    -{{ c.skills_data.missing_critical_skills[0] }}
+                  </span>
+                  {% endif %}
+                </div>
+                {% else %}
+                <span style="color: var(--text-dim); font-size: 0.8rem;">Pending analysis</span>
+                {% endif %}
+              </td>
+
+              <!-- Evidence & Anti-Noise Status -->
+              <td>
+                <div style="display: flex; flex-direction: column; gap: 4px;">
+                  {% if c.evidence_count > 0 %}
+                  <span style="font-size: 0.8rem; color: #34d399;">
+                    ✓ {{ c.verified_evidence_count }}/{{ c.evidence_count }} Proofs Verified
+                  </span>
+                  {% endif %}
+                  {% if c.noise_data and c.noise_data.noise_risk_level == 'HIGH' %}
+                  <span class="badge badge-danger" style="font-size: 0.68rem; padding: 2px 6px;">
+                    ⚠️ Keyword Stuffed
+                  </span>
+                  {% elif c.noise_data and c.noise_data.noise_risk_level == 'MEDIUM' %}
+                  <span class="badge badge-warning" style="font-size: 0.68rem; padding: 2px 6px;">
+                    ⚠️ Some Gaps
+                  </span>
+                  {% else %}
+                  <span style="font-size: 0.75rem; color: var(--text-dim);">Clean claims</span>
+                  {% endif %}
+                </div>
+              </td>
+
+              <!-- Action Link -->
+              <td>
+                <a href="/candidate/{{ c.id }}" class="btn btn-primary" style="padding: 8px 14px; font-size: 0.82rem;">
+                  Full Dossier ➔
+                </a>
+              </td>
+
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+      AI Recruitment Intelligence Agent • College Hackathon Project
+    </footer>
+  </div>
+
+  <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+</body>
+</html>
